@@ -1,20 +1,22 @@
 {
-  "name": "backend",
+  "name": "privacy-policy-analyzer-backend",
   "version": "1.0.0",
-  "main": "index.js",
+  "type": "module",
+  "description": "Backend API for Privacy Policy Analyzer",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
-    "axios": "^1.12.2",
-    "body-parser": "^2.2.0",
+    "express": "^4.18.2",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.3",
-    "express": "^5.1.0",
-    "type":"module"
+    "body-parser": "^1.20.2",
+    "dotenv": "^16.3.1",
+    "multer": "^1.4.5-lts.1",
+    "pdf-parse": "^1.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
   }
 }

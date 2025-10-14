@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
@@ -10,7 +10,7 @@ export default function ResultsPage() {
   const [activeTab, setActiveTab] = useState('comparison');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Demo data - replace with actual data from backend
+  // Demo data (fallback)
   const demoData = {
     originalText: `PRIVACY POLICY
 
@@ -186,7 +186,27 @@ Questions about this privacy policy? Contact us:
 - Address: 123 Tech Street, Silicon Valley, CA 94000`
   };
 
-  const filteredOriginalText = demoData.originalText
+  const [loaded, setLoaded] = useState(false);
+  const [originalText, setOriginalText] = useState(demoData.originalText);
+  const [simplifiedText, setSimplifiedText] = useState(demoData.simplifiedText);
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('analysisResult');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.originalText || parsed?.simplifiedText) {
+          setOriginalText(parsed.originalText || '');
+          setSimplifiedText(parsed.simplifiedText || '');
+          setStats(parsed.stats || null);
+        }
+      }
+    } catch (_) {}
+    setLoaded(true);
+  }, []);
+
+  const filteredOriginalText = (originalText || demoData.originalText)
     .split('\n')
     .filter(line => 
       searchTerm === '' || 
@@ -194,7 +214,7 @@ Questions about this privacy policy? Contact us:
     )
     .join('\n');
 
-  const filteredSimplifiedText = demoData.simplifiedText
+  const filteredSimplifiedText = (simplifiedText || demoData.simplifiedText)
     .split('\n')
     .filter(line => 
       searchTerm === '' || 
@@ -342,15 +362,15 @@ Questions about this privacy policy? Contact us:
           <h3 className="text-2xl font-bold mb-6">Analysis Summary</h3>
           <div className="grid md:grid-cols-3 gap-6">
             <div className="text-center">
-              <div className="text-3xl font-bold mb-2">85%</div>
+              <div className="text-3xl font-bold mb-2">{stats?.complexityReduction ? Math.round(stats.complexityReduction * 100) + '%' : '85%'}</div>
               <div className="text-blue-100">Complexity Reduction</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold mb-2">12</div>
+              <div className="text-3xl font-bold mb-2">{stats?.keyPoints ?? 12}</div>
               <div className="text-blue-100">Key Points Identified</div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold mb-2">3.2x</div>
+              <div className="text-3xl font-bold mb-2">{stats?.readingSpeedGain ? stats.readingSpeedGain + 'x' : '3.2x'}</div>
               <div className="text-blue-100">Faster to Read</div>
             </div>
           </div>
