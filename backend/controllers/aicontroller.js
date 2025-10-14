@@ -1,40 +1,38 @@
 import axios from "axios";
+import fs from "fs";
+import pdf from "pdf-parse";
 
-export const analyzePolicy = async (req, res) => {
+export const analyzePdf = async (req, res) => {
   try {
-    const { text } = req.body;
-
-    if (!text) {
-      return res.status(400).json({ error: "No text provided" });
+    const file = req.file;
+    if(!file){
+      return res.stattus(400).json({error:"No file provided"});
     }
 
-    const prompt = `
-    You are a privacy policy analyzer.
-    Summarize the following policy in plain language.
-    Highlight risky clauses (data sharing, tracking, third-party access).
-    Give a privacy risk score from 1 (safe) to 10 (risky).
-    Return the output as structured JSON:
-    {
-      "summary": "...",
-      "risky_clauses": ["..."],
-      "risk_score": "..."
-    }
+   const databuffer= fs.readFileSync(file.path);
 
-    Policy:
+   const pdfData=await pdf(databuffer);
+   const text=pdfData.text;
+
+   const prompt = `
+    Simplify the following document text and highlight important or risky clauses clearly:
     ${text}
     `;
 
-    // 🔹 Mistral (local Ollama) call
-    const response = await axios.post(
-      "http://localhost:11434/api/generate",
-      {
-        model: "mistral",
-        prompt: prompt,
-      }
-    );
+    // Send the text to Mistral running locally
+    const response = await axios.post("http://localhost:11434/api/generate", {
+      model: "mistral",
+      prompt,
+    });
 
-    // Ollama streams responses line by line — handle accordingly
-    const resultText = response.data.response || response.data; 
+    const airesult= response.data.response || response.data;
+
+    fs.unlinkSync(file.path);
+
+    // Send simplified text back to frontend
+    res.json({ simplifiedText: aiResult });
+
+
 
     res.json({ result: resultText });
   } catch (error) {
