@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
 import UploadArea from '../../components/UploadArea';
+import Chatbot from '../../components/Chatbot';
 
 export default function UploadPage() {
   const router = useRouter();
@@ -103,6 +104,31 @@ export default function UploadPage() {
           )}
         </div>
 
+        {/* AI Assistant Section */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 mb-8">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              Need Help Understanding Technical Terms?
+            </h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+              Our AI assistant can explain complex legal and technical terms found in government policies. 
+              Click the chat button to get instant explanations!
+            </p>
+            <div className="flex flex-wrap justify-center gap-2 mb-6">
+              <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm font-medium">GDPR</span>
+              <span className="px-3 py-1 bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded-full text-sm font-medium">CCPA</span>
+              <span className="px-3 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-full text-sm font-medium">HIPAA</span>
+              <span className="px-3 py-1 bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 rounded-full text-sm font-medium">PII</span>
+              <span className="px-3 py-1 bg-pink-100 dark:bg-pink-900 text-pink-800 dark:text-pink-200 rounded-full text-sm font-medium">Data Processing</span>
+            </div>
+          </div>
+        </div>
+
         {/* Features Reminder */}
         <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white">
           <h3 className="text-2xl font-bold mb-4">What happens next?</h3>
@@ -139,6 +165,7 @@ export default function UploadPage() {
       </main>
       
       <Footer />
+      <Chatbot />
     </div>
   );
 }
