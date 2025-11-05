@@ -22,43 +22,47 @@ export default function UploadPage() {
     setFile(null);
   };
 
-  const handleUpload = async () => {
-    if (!file) return;
-    
-    setUploading(true);
-    setUploadProgress(0);
-    
-    // Simulate upload progress
-    const progressInterval = setInterval(() => {
-      setUploadProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return prev;
-        }
-        return prev + 10;
-      });
-    }, 200);
-    
+  // ...existing code...
+// ...existing code...
+const handleUpload = async () => {
+  if (!file) return;
+  const form = new FormData();
+  form.append("file", file); // must match multer field name "file"
+
+  setUploading(true);
+  setUploadProgress(0);
+
+  try {
+    const res = await fetch("http://localhost:5000/api/upload", {
+      method: "POST",
+      body: form, // DO NOT set Content-Type manually
+    });
+
+    let responseBody;
     try {
-      const result = await analyzePdf(file);
-      setUploadProgress(100);
-
-      // Persist result for results page
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('analysisResult', JSON.stringify(result));
-      }
-
-      setUploading(false);
-      setUploadProgress(0);
-      setFile(null);
-      router.push('/results');
-    } catch (error) {
-      setUploading(false);
-      setUploadProgress(0);
-      alert('Upload failed. Please try again.');
+      responseBody = await res.json();
+    } catch (err) {
+      responseBody = { error: "Invalid JSON response", details: err.message };
     }
-  };
 
+    console.log("upload response", res.status, responseBody);
+
+    if (!res.ok) {
+      // show server error details
+      throw new Error(responseBody?.error || `Upload failed (status ${res.status})`);
+    }
+
+    // handle success
+    // ...
+  } catch (err) {
+    console.error("Upload failed:", err);
+    // show user-friendly message in UI
+  } finally {
+    setUploading(false);
+  }
+};
+// ...existing code...
+// ...existing code...
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
       <Header showUploadButton={false} />

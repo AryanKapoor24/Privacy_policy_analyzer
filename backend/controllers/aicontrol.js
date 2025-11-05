@@ -1,49 +1,54 @@
-// Import dependencies
-import fs from "fs";
-import { execSync } from "child_process";
-import { PDFParse } from 'pdf-parse';
+import * as pdfParseModule from "pdf-parse";
+
+async function parsePdfBuffer(buffer) {
+  const pdfLib = pdfParseModule?.default ?? pdfParseModule;
+
+  // Try calling as a function
+  if (typeof pdfLib === "function") {
+    try {
+      return await pdfLib(buffer);
+    } catch (err) {
+      // fall through to try constructor/instance API
+      console.warn("pdf-parse function call failed, trying constructor/instance API:", err.message);
+    }
+  }
+
+  // Try constructor / instance parse()
+  try {
+    const instance = new pdfLib(buffer);
+    if (typeof instance.parse === "function") {
+      return await instance.parse();
+    }
+    if (instance && typeof instance.then === "function") {
+      return await instance;
+    }
+  } catch (err) {
+    // rethrow for outer handler to capture details
+    throw err;
+  }
+
+  // last attempt
+  return await pdfLib(buffer);
+}
 
 export const analyzePDF = async (req, res) => {
   try {
-    // 🧩 Check if file exists (multer adds req.file)
-    if (!req.file || !req.file.buffer) {
-      return res.status(400).json({ error: "No file uploaded" });
-    }
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-    // Read PDF content into buffer
-    const fileBuffer = req.file.buffer;
+    const data = await parsePdfBuffer(req.file.buffer);
+    const text = (data?.text || "").trim();
+    const pages = data?.numpages ?? data?.numPages ?? null;
+    const wordCount = text ? text.split(/\s+/).filter(Boolean).length : 0;
 
-    // Extract text from PDF
-    const data = await PDFParse(fileBuffer);
-    const text = data.text?.trim() || "";
-
-    // Safety check: empty PDFs
-    if (!text) {
-      return res.status(400).json({ error: "Could not extract text from PDF" });
-    }
-
-    // 🧠 Create a meaningful prompt for Mistral
-    const prompt = `Simplify the following privacy policy or legal document and highlight risky clauses or unclear terms:\n\n${text}`;
-
-    // ⚙️ Run the local Mistral model using Ollama CLI
-    // escape quotes properly
-    const safePrompt = prompt.replace(/"/g, '\\"');
-    const command = `ollama run mistral "${safePrompt}"`;
-
-    // Execute and capture the model output
-    const result = execSync(command, { encoding: "utf-8" });
-
-    // Send both versions to frontend
-    res.json({
-      originalText: text,
-      simplifiedText: result,
+    return res.json({
+      pages,
+      wordCount,
+      preview: text.slice(0, 2000),
+      textLength: text.length,
     });
-
-  } catch (error) {
-    console.error("❌ Error analyzing PDF:", error);
-    res.status(500).json({
-      error: "Failed to process document",
-      details: error.message,
-    });
+  } catch (err) {
+    // log full error for debugging
+    console.error("analyzePDF error:", err && err.stack ? err.stack : err);
+    return res.status(500).json({ error: "Failed to process document", details: err?.message || String(err) });
   }
 };
