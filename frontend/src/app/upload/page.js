@@ -22,47 +22,72 @@ export default function UploadPage() {
     setFile(null);
   };
 
-  // ...existing code...
-// ...existing code...
-const handleUpload = async () => {
-  if (!file) return;
-  const form = new FormData();
-  form.append("file", file); // must match multer field name "file"
+  const handleUpload = async () => {
+    if (!file) return;
+    const form = new FormData();
+    form.append("pdfFile", file);
 
-  setUploading(true);
-  setUploadProgress(0);
+    setUploading(true);
+    setUploadProgress(0);
 
-  try {
-    const res = await fetch("http://localhost:5000/api/upload", {
-      method: "POST",
-      body: form, // DO NOT set Content-Type manually
-    });
-
-    let responseBody;
     try {
-      responseBody = await res.json();
+      // Create XMLHttpRequest for progress tracking
+      const xhr = new XMLHttpRequest();
+      
+      // Set up progress tracking
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(percentComplete);
+        }
+      };
+
+      // Wrap XHR in a Promise for better async/await handling
+      const response = await new Promise((resolve, reject) => {
+        xhr.open("POST", "http://localhost:5000/upload");
+        xhr.onload = () => resolve(xhr);
+        xhr.onerror = () => reject(new Error("Network error while uploading file"));
+        xhr.onabort = () => reject(new Error("Upload was cancelled"));
+        xhr.send(form);
+      });
+
+      let responseBody;
+      try {
+        responseBody = JSON.parse(response.responseText);
+      } catch (err) {
+        console.error("Failed to parse JSON response:", err);
+        throw new Error("Invalid response from server");
+      }
+
+      if (response.status >= 400 || !responseBody.success) {
+        throw new Error(responseBody?.error || `Upload failed with status ${response.status}`);
+      }
+
+      console.log("Upload successful:", responseBody);
+      
+      // Store the parsed data in session storage
+      sessionStorage.setItem('analysisResults', JSON.stringify({
+        fileName: file.name,
+        fileSize: file.size,
+        text: responseBody.text,
+        pages: responseBody.pages,
+        wordCount: responseBody.wordCount,
+        preview: responseBody.preview,
+        timestamp: new Date().toISOString()
+      }));
+      
+      // Redirect to results page
+      router.push('/results');
+      
     } catch (err) {
-      responseBody = { error: "Invalid JSON response", details: err.message };
+      console.error("Upload failed:", err);
+      // Show user-friendly error message
+      alert(`Upload failed: ${err.message}`);
+    } finally {
+      setUploading(false);
     }
+  };
 
-    console.log("upload response", res.status, responseBody);
-
-    if (!res.ok) {
-      // show server error details
-      throw new Error(responseBody?.error || `Upload failed (status ${res.status})`);
-    }
-
-    // handle success
-    // ...
-  } catch (err) {
-    console.error("Upload failed:", err);
-    // show user-friendly message in UI
-  } finally {
-    setUploading(false);
-  }
-};
-// ...existing code...
-// ...existing code...
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
       <Header showUploadButton={false} />

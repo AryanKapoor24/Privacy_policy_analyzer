@@ -1,50 +1,91 @@
-import * as pdfParseModule from "pdf-parse";
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import fs from 'fs/promises';
 
-async function parsePdfBuffer(buffer) {
-  const pdfLib = pdfParseModule?.default ?? pdfParseModule;
+// Ensure the uploads directory exists
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const UPLOADS_DIR = join(__dirname, '..', 'uploads');
+const JSON_OUTPUT_DIR = join(UPLOADS_DIR, 'parsed');
 
-  // Try calling as a function
-  if (typeof pdfLib === "function") {
-    try {
-      return await pdfLib(buffer);
-    } catch (err) {
-      // fall through to try constructor/instance API
-      console.warn("pdf-parse function call failed, trying constructor/instance API:", err.message);
-    }
-  }
-
-  // Try constructor / instance parse()
+// Create directories if they don't exist
+const ensureDirExists = async (dir) => {
   try {
-    const instance = new pdfLib(buffer);
-    if (typeof instance.parse === "function") {
-      return await instance.parse();
-    }
-    if (instance && typeof instance.then === "function") {
-      return await instance;
-    }
+    await fs.mkdir(dir, { recursive: true });
   } catch (err) {
-    // rethrow for outer handler to capture details
-    throw err;
+    if (err.code !== 'EEXIST') throw err;
   }
+};
 
-  // last attempt
-  return await pdfLib(buffer);
-}
+// Initialize directories
+await ensureDirExists(UPLOADS_DIR);
+await ensureDirExists(JSON_OUTPUT_DIR);
+
+const parsePdfBuffer = async (buffer) => {
+    try {
+        // Use dynamic import for better ESM compatibility
+        const { default: pdfParse } = await import('pdf-parse/lib/pdf-parse.js');
+        
+        console.log("pdf-parse loaded successfully");
+        
+        if (typeof pdfParse !== 'function') {
+            throw new Error(`Could not load pdf-parse library function. Resolved type: ${typeof pdfParse}`);
+        }
+
+        const data = await pdfParse(buffer);
+        return data.text;
+    } catch (error) {
+        console.error("Error parsing PDF buffer:", error);
+        throw new Error("Failed to parse PDF content: " + error.message);
+    }
+};
 
 export const analyzePDF = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-    const data = await parsePdfBuffer(req.file.buffer);
-    const text = (data?.text || "").trim();
-    const pages = data?.numpages ?? data?.numPages ?? null;
+    const result = await parsePdfBuffer(req.file.buffer);
+    const text = (result?.text || "").trim();
+    const pages = result?.pages?.length || 1; // Get page count from the result
     const wordCount = text ? text.split(/\s+/).filter(Boolean).length : 0;
-
-    return res.json({
+    
+    // Create a unique filename using timestamp and random number
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 10000);
+    const jsonFilename = `doc_${timestamp}_${random}.json`;
+    const jsonPath = join(JSON_OUTPUT_DIR, jsonFilename);
+    
+    // Prepare the data to save
+    const jsonData = {
+      originalFilename: req.file.originalname,
+      timestamp: new Date().toISOString(),
       pages,
       wordCount,
-      preview: text.slice(0, 2000),
       textLength: text.length,
+      preview: text.slice(0, 2000),
+      fullText: text,
+      metadata: {
+        pageCount: pages,
+        characters: text.length,
+        words: wordCount,
+      }
+    };
+    
+    // Save as JSON file
+    await fs.writeFile(jsonPath, JSON.stringify(jsonData, null, 2), 'utf-8');
+    
+    // Return the response with the path to the JSON file
+    return res.json({
+      success: true,
+      pages,
+      wordCount,
+      preview: jsonData.preview,
+      textLength: jsonData.textLength,
+      jsonFile: `/api/uploads/parsed/${jsonFilename}`, // Public URL to access the file
+      timestamp: jsonData.timestamp,
+      originalFilename: req.file.originalname
     });
   } catch (err) {
     // log full error for debugging
