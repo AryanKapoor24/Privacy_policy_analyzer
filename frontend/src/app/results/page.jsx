@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Header from '../../components/Header';
 import Footer from '../../components/Footer';
+import Timeline from '../../components/Timeline';
 
 // ComparisonView component for side-by-side comparison
 const ComparisonView = ({ originalText, simplifiedText, searchTerm, processingStatus }) => {
@@ -420,6 +421,11 @@ export default function ResultsPage() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Timeline / Deadlines Section */}
+        <div className="mt-12 animate-fade-in-up" style={{animationDelay: '0.4s'}}>
+          <Timeline collectionId={analysisData?.collection_id} />
         </div>
       </main>
 

@@ -305,6 +305,97 @@ app.get('/api/original-text/:collection_id', async (req, res) => {
 });
 
 // ==============================
+// EXTRACT DEADLINES/TIMELINE ENDPOINT (Non-blocking, cached)
+// ==============================
+const deadlineCache = new Map(); // In-memory cache for deadline results
+
+app.post('/api/extract-deadlines', async (req, res) => {
+  try {
+    const { collection_id } = req.body;
+    if (!collection_id) {
+      return res.status(400).json({ error: 'collection_id is required' });
+    }
+
+    // Check cache first (avoid redundant extractions)
+    if (deadlineCache.has(collection_id)) {
+      const cached = deadlineCache.get(collection_id);
+      console.log(`✓ Returning cached deadlines for ${collection_id}`);
+      return res.json(cached);
+    }
+
+    console.log(`📅 Extracting deadlines from collection: ${collection_id}`);
+
+    // Fetch original text from Python server (only first 4000 chars for speed)
+    const textResponse = await axios.get(`${PYTHON_API_URL}/get-text/${collection_id}`, {
+      timeout: 5000 // Quick timeout for text fetch
+    });
+    const originalText = textResponse.data?.full_text || '';
+
+    if (!originalText) {
+      const response = { collection_id, deadlines: [], count: 0, message: 'No text found' };
+      deadlineCache.set(collection_id, response);
+      return res.json(response);
+    }
+
+    // Use Groq to extract deadlines and dates (limited text + reduced tokens for speed)
+    const extractionPrompt = `Extract ONLY date-based deadlines and time-bound actions. Be brief.
+
+Return ONLY a JSON array, no text before or after:
+[{"date": "...", "action": "...", "priority": "high|medium|low"}, ...]
+
+Document excerpt:
+${originalText.substring(0, 4000)}`;
+
+    console.log('🔄 Calling Groq for deadline extraction (fast mode)...');
+    let deadlineJson = '';
+    try {
+      deadlineJson = await callGroq(extractionPrompt, 300); // Reduced tokens for speed
+    } catch (groqErr) {
+      console.error('Groq extraction failed:', groqErr.message);
+      // Return empty result on failure instead of error
+      const response = { collection_id, deadlines: [], count: 0, message: 'Deadline extraction skipped' };
+      deadlineCache.set(collection_id, response);
+      return res.json(response);
+    }
+
+    // Parse the JSON response
+    let deadlines = [];
+    try {
+      // Find JSON array in the response
+      const jsonMatch = deadlineJson.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        deadlines = JSON.parse(jsonMatch[0]);
+        // Validate structure
+        deadlines = deadlines.filter(d => d.date && d.action);
+      }
+    } catch (parseErr) {
+      console.error('Failed to parse deadline JSON:', parseErr.message);
+      deadlines = [];
+    }
+
+    console.log(`✓ Extracted ${deadlines.length} deadlines`);
+
+    // Cache the result for subsequent requests
+    const response = {
+      collection_id,
+      deadlines: deadlines,
+      count: deadlines.length,
+      message: deadlines.length > 0 ? 'Timeline extracted successfully' : 'No specific deadlines found in document'
+    };
+    
+    deadlineCache.set(collection_id, response);
+    res.json(response);
+
+  } catch (err) {
+    console.error("Deadline extraction error:", err.response ? err.response.data : err.message);
+    // Return empty result instead of error to avoid disrupting frontend
+    const response = { collection_id: req.body.collection_id, deadlines: [], count: 0, message: 'Extraction unavailable' };
+    deadlineCache.set(req.body.collection_id, response);
+    res.json(response);
+  }
+});
+
+// ==============================
 // SERVER START
 // ==============================
 app.listen(PORT, () => {
