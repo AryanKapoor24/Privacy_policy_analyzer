@@ -80,7 +80,8 @@ async def process_pdf(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail="Invalid file type. Only PDFs are accepted.")
 
     # Create a unique collection ID based on the filename and current time
-    collection_id = f"rag_{os.path.splitext(file.filename)[0]}_{int(os.path.getmtime(UPLOADS_DIR) if os.path.exists(UPLOADS_DIR) else 0)}"
+    import time
+    collection_id = f"rag_{os.path.splitext(file.filename)[0]}_{int(time.time())}"
     
     # Ensure the temporary uploads directory exists
     os.makedirs(UPLOADS_DIR, exist_ok=True)
@@ -105,7 +106,7 @@ async def process_pdf(file: UploadFile = File(...)):
         # 3. Create vector store and add documents
         vector_store = get_vector_store(collection_id)
         vector_store.add_documents(chunks)
-        vector_store.persist() # Save to disk
+        # Note: Chroma auto-persists in versions >= 0.4.0, no need to call persist()
 
         return ProcessResponse(
             collection_id=collection_id,
@@ -178,8 +179,11 @@ async def get_full_text(collection_id: str):
         print(f"Error getting full text: {e}")
         raise HTTPException(status_code=404, detail=f"Could not retrieve full text for collection '{collection_id}'.")
 
-# Health check endpoint
+# Health check endpoints
 @app.get("/health")
 def health_check():
-# ... existing code ...
     return {"status": "ok"}
+
+@app.get("/api/health")
+def api_health_check():
+    return {"ok": True, "message": "Python RAG server is running"}
